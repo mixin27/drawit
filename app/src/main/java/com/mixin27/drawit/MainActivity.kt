@@ -2,21 +2,22 @@ package com.mixin27.drawit
 
 import android.Manifest
 import android.app.Dialog
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.media.MediaScannerConnection
-import android.os.AsyncTask
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.get
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var llPaintColors: LinearLayout
     private lateinit var flContainerView: FrameLayout
     private lateinit var ivBackground: ImageView
+    private var mProgressDialog: Dialog? = null
 
     private var mImageButtonCurrentPaint: ImageButton? = null
 
@@ -76,8 +78,11 @@ class MainActivity : AppCompatActivity() {
         ibSave = findViewById(R.id.ib_save)
         ibSave.setOnClickListener {
             if (isReadStorageAllowed()) {
-                BitmapAsyncTask(getBitmapFromView(flContainerView)).execute()
-
+                showProgressDialog()
+                lifecycleScope.launch {
+                    val bitmap = getBitmapFromView(flContainerView)
+                    saveBitmapFile(bitmap)
+                }
             } else {
                 requestStoragePermission()
             }
@@ -195,72 +200,60 @@ class MainActivity : AppCompatActivity() {
         return bitmap
     }
 
-    private inner class BitmapAsyncTask(val bitmap: Bitmap) : AsyncTask<Any, Void, String>() {
-        private lateinit var mProgressDialog: Dialog
+    private suspend fun saveBitmapFile(bitmap: Bitmap?): String {
+        var result = ""
 
-        override fun onPreExecute() {
-            super.onPreExecute()
-            showProgressDialog()
-        }
-
-        override fun doInBackground(vararg params: Any?): String {
-            var result = ""
+        withContext(Dispatchers.IO) {
             if (bitmap != null) {
                 try {
                     val bytes = ByteArrayOutputStream()
                     bitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
 
-                    val file =
-                        File(
-                            externalCacheDir!!.absoluteFile.toString()
-                                    + File.separator + "drawit_"
-                                    + System.currentTimeMillis() / 1000 + ".png"
-                        )
-                    val fos = FileOutputStream(file)
+                    val f = File(
+                        externalCacheDir?.absoluteFile.toString()
+                                + File.separator + "drawit_"
+                                + System.currentTimeMillis() / 1000
+                                + ".png"
+                    )
+
+                    val fos = FileOutputStream(f)
                     fos.write(bytes.toByteArray())
                     fos.close()
 
-                    result = file.absolutePath
+                    result = f.absolutePath
+
+                    runOnUiThread {
+                        cancelProgressDialog()
+                        if (result.isNotEmpty()) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "File is successfully saved to $result",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            Toast.makeText(this@MainActivity, "Failed to save to storage", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
                 } catch (e: Exception) {
                     result = ""
                     e.printStackTrace()
                 }
             }
-
-            return result
         }
+        return result
+    }
 
-        override fun onPostExecute(result: String?) {
-            super.onPostExecute(result)
-            cancelProgressDialog()
-            if (result!!.isNotEmpty()) {
-                Toast.makeText(
-                    this@MainActivity,
-                    "File is successfully saved to $result",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                Toast.makeText(this@MainActivity, "Failed to save to storage", Toast.LENGTH_SHORT)
-                    .show()
-            }
+    private fun showProgressDialog() {
+        mProgressDialog = Dialog(this@MainActivity)
+        mProgressDialog?.setContentView(R.layout.dialog_custom_progress)
+        mProgressDialog?.show()
+    }
 
-            MediaScannerConnection.scanFile(this@MainActivity, arrayOf(result), null) { _, uri ->
-                val shareIntent = Intent()
-                shareIntent.action = Intent.ACTION_SEND
-                shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
-                shareIntent.type = "image/png"
-                startActivity(Intent.createChooser(shareIntent, "Share"))
-            }
-        }
-
-        private fun showProgressDialog() {
-            mProgressDialog = Dialog(this@MainActivity)
-            mProgressDialog.setContentView(R.layout.dialog_custom_progress)
-            mProgressDialog.show()
-        }
-
-        private fun cancelProgressDialog() {
-            mProgressDialog.dismiss()
+    private fun cancelProgressDialog() {
+        if (mProgressDialog != null) {
+            mProgressDialog?.dismiss()
+            mProgressDialog = null
         }
     }
 
