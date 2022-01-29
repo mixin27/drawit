@@ -2,10 +2,12 @@ package com.mixin27.drawit
 
 import android.Manifest
 import android.app.Dialog
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.media.MediaScannerConnection
 import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -232,9 +234,22 @@ class MainActivity : AppCompatActivity() {
             super.onPostExecute(result)
             cancelProgressDialog()
             if (result!!.isNotEmpty()) {
-                Toast.makeText(this@MainActivity, "File is successfully saved to $result", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@MainActivity,
+                    "File is successfully saved to $result",
+                    Toast.LENGTH_SHORT
+                ).show()
             } else {
-                Toast.makeText(this@MainActivity, "Failed to save to storage", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Failed to save to storage", Toast.LENGTH_SHORT)
+                    .show()
+            }
+
+            MediaScannerConnection.scanFile(this@MainActivity, arrayOf(result), null) { _, uri ->
+                val shareIntent = Intent()
+                shareIntent.action = Intent.ACTION_SEND
+                shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
+                shareIntent.type = "image/png"
+                startActivity(Intent.createChooser(shareIntent, "Share"))
             }
         }
 
