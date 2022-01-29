@@ -194,6 +194,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private inner class BitmapAsyncTask(val bitmap: Bitmap) : AsyncTask<Any, Void, String>() {
+        private lateinit var mProgressDialog: Dialog
+
+        override fun onPreExecute() {
+            super.onPreExecute()
+            showProgressDialog()
+        }
+
         override fun doInBackground(vararg params: Any?): String {
             var result = ""
             if (bitmap != null) {
@@ -223,11 +230,22 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPostExecute(result: String?) {
             super.onPostExecute(result)
+            cancelProgressDialog()
             if (result!!.isNotEmpty()) {
                 Toast.makeText(this@MainActivity, "File is successfully saved to $result", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this@MainActivity, "Failed to save to storage", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        private fun showProgressDialog() {
+            mProgressDialog = Dialog(this@MainActivity)
+            mProgressDialog.setContentView(R.layout.dialog_custom_progress)
+            mProgressDialog.show()
+        }
+
+        private fun cancelProgressDialog() {
+            mProgressDialog.dismiss()
         }
     }
 

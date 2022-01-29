@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Drawit</string>
+    <string name="saving">Saving...</string>
 </resources>
