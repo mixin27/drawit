@@ -186,6 +186,15 @@
             android:scaleType="fitXY"
             app:srcCompat="@drawable/ic_baseline_brush" />
 
+        <ImageButton
+            android:id="@+id/ib_save"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_marginStart="5dp"
+            android:contentDescription="image_brush"
+            android:scaleType="fitXY"
+            app:srcCompat="@drawable/ic_baseline_save" />
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

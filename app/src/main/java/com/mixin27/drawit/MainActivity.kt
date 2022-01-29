@@ -3,24 +3,30 @@ package com.mixin27.drawit
 import android.Manifest
 import android.app.Dialog
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.get
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
     private lateinit var drawingView: DrawingView
     private lateinit var ibBrush: ImageButton
     private lateinit var ibGallery: ImageButton
     private lateinit var ibUndo: ImageButton
+    private lateinit var ibSave: ImageButton
     private lateinit var llPaintColors: LinearLayout
+    private lateinit var flContainerView: FrameLayout
     private lateinit var ivBackground: ImageView
 
     private var mImageButtonCurrentPaint: ImageButton? = null
@@ -62,6 +68,17 @@ class MainActivity : AppCompatActivity() {
         ibUndo = findViewById(R.id.ib_undo)
         ibUndo.setOnClickListener {
             drawingView.doUndo()
+        }
+
+        flContainerView = findViewById(R.id.fl_drawing_view_container)
+        ibSave = findViewById(R.id.ib_save)
+        ibSave.setOnClickListener {
+            if (isReadStorageAllowed()) {
+                BitmapAsyncTask(getBitmapFromView(flContainerView)).execute()
+
+            } else {
+                requestStoragePermission()
+            }
         }
     }
 
@@ -155,8 +172,63 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isReadStorageAllowed(): Boolean {
-        val result = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+        val result =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
         return result == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun getBitmapFromView(view: View): Bitmap {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val bgDrawable = view.background
+
+        if (bgDrawable != null) {
+            bgDrawable.draw(canvas)
+        } else {
+            canvas.drawColor(Color.WHITE)
+        }
+
+        view.draw(canvas)
+
+        return bitmap
+    }
+
+    private inner class BitmapAsyncTask(val bitmap: Bitmap) : AsyncTask<Any, Void, String>() {
+        override fun doInBackground(vararg params: Any?): String {
+            var result = ""
+            if (bitmap != null) {
+                try {
+                    val bytes = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
+
+                    val file =
+                        File(
+                            externalCacheDir!!.absoluteFile.toString()
+                                    + File.separator + "drawit_"
+                                    + System.currentTimeMillis() / 1000 + ".png"
+                        )
+                    val fos = FileOutputStream(file)
+                    fos.write(bytes.toByteArray())
+                    fos.close()
+
+                    result = file.absolutePath
+                } catch (e: Exception) {
+                    result = ""
+                    e.printStackTrace()
+                }
+            }
+
+            return result
+        }
+
+        override fun onPostExecute(result: String?) {
+            super.onPostExecute(result)
+            if (result!!.isNotEmpty()) {
+                Toast.makeText(this@MainActivity, "File is successfully saved to $result", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@MainActivity, "Failed to save to storage", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     companion object {
